@@ -6,6 +6,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     container:
       image: espressif/idf:v4.4.8
 
@@ -22,13 +23,32 @@ jobs:
         shell: bash
         run: |
           . $IDF_PATH/export.sh
+
           git config --global --add safe.directory '*'
 
           python -m pip install --upgrade pip
-          python -m pip install "protobuf==4.25.6" "grpcio-tools==1.62.3"
+          python -m pip install \
+            "protobuf==4.25.6" \
+            "grpcio-tools==1.62.3"
 
+          # 1. Buat stub esp_eth.h agar kompiler tidak mengeluh fatal error jika header tidak terdeteksi
+          mkdir -p components/wifi-manager/include
+          cat << 'EOF' > components/wifi-manager/include/esp_eth.h
+          #ifndef ESP_ETH_H
+          #define ESP_ETH_H
+          #endif
+          EOF
+
+          # 2. Patch CMakeLists wifi-manager untuk mendaftarkan esp_eth
+          if [ -f components/wifi-manager/CMakeLists.txt ]; then
+            sed -i 's/PRIV_REQUIRES/PRIV_REQUIRES esp_eth/g' components/wifi-manager/CMakeLists.txt || true
+            sed -i 's/REQUIRES/REQUIRES esp_eth/g' components/wifi-manager/CMakeLists.txt || true
+          fi
+
+          # 3. Bersihkan build/config lama
           rm -rf build sdkconfig
 
+          # 4. Konfigurasi ESP32-S3 N16R8
           cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
@@ -42,15 +62,24 @@ jobs:
           CONFIG_ETH_USE_SPI_ETHERNET=n
           EOF
 
+          # Set target ESP32-S3
           idf.py set-target esp32s3
 
-          # Inject flag fexceptions langsung ke CMakeLists utama agar tidak bentrok di CLI
+          # Tambahkan dukungan C++ exceptions untuk CSpot
           echo 'string(APPEND CMAKE_CXX_FLAGS " -fexceptions")' >> CMakeLists.txt
 
       - name: Build Firmware
         shell: bash
         run: |
           . $IDF_PATH/export.sh
+
+          echo "=== ESP-IDF VERSION ==="
+          idf.py --version
+
+          echo "=== TARGET ==="
+          grep 'CONFIG_IDF_TARGET=' sdkconfig
+
+          echo "=== BUILD ==="
           idf.py build
 
       - name: Upload Binaries
