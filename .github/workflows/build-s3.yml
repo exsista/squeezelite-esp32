@@ -29,7 +29,6 @@ jobs:
 
           rm -rf build sdkconfig
 
-          # Tulis sdkconfig.defaults dengan format kofigurasi ESP-IDF yang valid
           cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
@@ -40,6 +39,7 @@ jobs:
           CONFIG_SPIRAM_TYPE_AUTO=y
           CONFIG_ETH_USE_ESP32_EMAC=n
           CONFIG_ETH_USE_SPI_ETHERNET=n
+          CONFIG_COMPILER_CXX_EXCEPTIONS=y
           EOF
 
           idf.py set-target esp32s3
@@ -49,10 +49,10 @@ jobs:
         run: |
           . $IDF_PATH/export.sh
           
-          # Tembakkan langsung variabel FreeRTOS ke sdkconfig hasil generate
           echo "CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2" >> sdkconfig
+          echo "CONFIG_COMPILER_CXX_EXCEPTIONS=y" >> sdkconfig
 
-          idf.py build -DDEPTH=32
+          idf.py -DEXTRA_CXXFLAGS="-fexceptions" build -DDEPTH=32
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
