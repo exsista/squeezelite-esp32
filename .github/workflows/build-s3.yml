@@ -10,9 +10,10 @@ jobs:
       image: espressif/idf:v4.4.8
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Squeezelite Codebase
         uses: actions/checkout@v4
         with:
+          repository: 'sle118/squeezelite-esp32'
           ref: 'master-v4.3'
           submodules: 'recursive'
           fetch-depth: 0
@@ -23,8 +24,6 @@ jobs:
           . $IDF_PATH/export.sh
           
           git config --global --add safe.directory '*'
-
-          git submodule update --init --recursive
 
           cat << 'EOF' >> sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
