@@ -28,9 +28,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "protobuf<4.0.0" "grpcio-tools<1.50.0"
 
-          # Salin komponen esp_eth langsung ke dalam komponen proyek
-          cp -r $IDF_PATH/components/esp_eth components/
-
           cat << 'EOF' >> sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
@@ -44,7 +41,7 @@ jobs:
           EOF
 
           idf.py set-target esp32s3
-          idf.py build
+          idf.py build -DEXTRA_COMPONENT_DIRS="$IDF_PATH/components/esp_eth"
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
