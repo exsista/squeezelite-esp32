@@ -18,30 +18,29 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Prepare and Patch Headers
+      - name: Prepare Dependencies and Config
         shell: bash
         run: |
           . $IDF_PATH/export.sh
-          
           git config --global --add safe.directory '*'
 
+          # Pasang dependensi python versi spesifik untuk ESP-IDF 4.4.8
           python -m pip install --upgrade pip
-          python -m pip install "protobuf<4.0.0" "grpcio-tools<1.50.0"
+          python -m pip install "protobuf==4.25.6" "grpcio-tools==1.62.3"
 
-          # Trik: Buat dummy header esp_eth.h agar wifi-manager tidak error saat kompilasi S3
-          mkdir -p components/wifi-manager/code/include
-          touch components/wifi-manager/code/include/esp_eth.h
+          # Bersihkan build sebelumnya jika ada
+          rm -rf build sdkconfig
 
-          cat << 'EOF' >> sdkconfig.defaults
-          CONFIG_IDF_TARGET="esp32s3"
-          CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
-          CONFIG_ETH_USE_ESP32_EMAC=n
-          CONFIG_ETH_USE_SPI_ETHERNET=n
-          CONFIG_SPIRAM=y
-          CONFIG_SPIRAM_MODE_OCT=y
+          # Buat sdkconfig bawaan khusus ESP32-S3 N16R8
+          cat << 'EOF' > sdkconfig.defaults
+          CONFIG_IDF_TARGET="esp32s3"=y
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
           CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+          CONFIG_SPIRAM=y
+          CONFIG_SPIRAM_MODE_OCT=y
           CONFIG_SPIRAM_TYPE_AUTO=y
+          CONFIG_ETH_USE_ESP32_EMAC=n
+          CONFIG_ETH_USE_SPI_ETHERNET=n
           EOF
 
           idf.py set-target esp32s3
@@ -50,7 +49,8 @@ jobs:
         shell: bash
         run: |
           . $IDF_PATH/export.sh
-          idf.py build
+          # Parameter DEPTH=32 sesuai rekomendasi build S3
+          idf.py build -DDEPTH=32
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
