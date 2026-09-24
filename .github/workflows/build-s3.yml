@@ -18,7 +18,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Prepare and Build
+      - name: Prepare and Patch Headers
         shell: bash
         run: |
           . $IDF_PATH/export.sh
@@ -27,6 +27,10 @@ jobs:
 
           python -m pip install --upgrade pip
           python -m pip install "protobuf<4.0.0" "grpcio-tools<1.50.0"
+
+          # Trik: Buat dummy header esp_eth.h agar wifi-manager tidak error saat kompilasi S3
+          mkdir -p components/wifi-manager/code/include
+          touch components/wifi-manager/code/include/esp_eth.h
 
           cat << 'EOF' >> sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
@@ -41,7 +45,12 @@ jobs:
           EOF
 
           idf.py set-target esp32s3
-          idf.py build -DEXTRA_COMPONENT_DIRS="$IDF_PATH/components/esp_eth"
+
+      - name: Build Firmware
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py build
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
