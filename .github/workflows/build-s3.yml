@@ -28,12 +28,16 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install protobuf grpcio-tools
 
-          cat << 'EOF' >> sdkconfig.defaults
+          export CFLAGS="-I$IDF_PATH/components/esp_eth/include $CFLAGS"
+          export CXXFLAGS="-I$IDF_PATH/components/esp_eth/include $CXXFLAGS"
+
+          cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_SPIRAM=y
           CONFIG_SPIRAM_MODE_OCT=y
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
           CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+          CONFIG_SPIRAM_TYPE_AUTO=y
           EOF
 
           idf.py set-target esp32s3
