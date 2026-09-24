@@ -6,7 +6,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: espressif/idf:v4.4.8
+    container:
+      image: espressif/idf:v4.4.8
 
     steps:
       - name: Checkout Code
@@ -15,14 +16,16 @@ jobs:
           submodules: 'recursive'
 
       - name: Prepare and Build
+        shell: bash
         run: |
+          . $IDF_PATH/export.sh
           pip install --upgrade pip
           pip install protobuf==4.25.6 grpcio-tools==1.62.3
           idf.py set-target esp32s3
-          echo "CONFIG_IDF_TARGET=\"esp32s3\"" >> sdkconfig.defaults
-          echo "CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y" >> sdkconfig.defaults
-          echo "CONFIG_SPIRAM_MODE_OCT=y" >> sdkconfig.defaults
-          echo "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y" >> sdkconfig.defaults
+          echo 'CONFIG_IDF_TARGET="esp32s3"' >> sdkconfig.defaults
+          echo 'CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y' >> sdkconfig.defaults
+          echo 'CONFIG_SPIRAM_MODE_OCT=y' >> sdkconfig.defaults
+          echo 'CONFIG_ESPTOOLPY_FLASHMODE_DIO=y' >> sdkconfig.defaults
           idf.py build
 
       - name: Upload Binaries
