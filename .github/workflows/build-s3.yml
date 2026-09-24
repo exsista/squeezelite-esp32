@@ -26,17 +26,13 @@ jobs:
           git config --global --add safe.directory '*'
 
           python -m pip install --upgrade pip
-          python -m pip install protobuf grpcio-tools
-
-          # Buat stub esp_eth.h agar compiler tidak error fatal
-          mkdir -p components/wifi-manager/include
-          echo "#ifndef ESP_ETH_H" > components/wifi-manager/include/esp_eth.h
-          echo "#define ESP_ETH_H" >> components/wifi-manager/include/esp_eth.h
-          echo "#endif" >> components/wifi-manager/include/esp_eth.h
+          python -m pip install "protobuf<4.0.0" "grpcio-tools<1.50.0"
 
           cat << 'EOF' >> sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
+          CONFIG_ETH_USE_ESP32_EMAC=n
+          CONFIG_ETH_USE_SPI_ETHERNET=n
           CONFIG_SPIRAM=y
           CONFIG_SPIRAM_MODE_OCT=y
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
@@ -45,7 +41,7 @@ jobs:
           EOF
 
           idf.py set-target esp32s3
-          idf.py build
+          idf.py -DEXTRA_COMPONENT_DIRS="$IDF_PATH/components/esp_eth" build
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
