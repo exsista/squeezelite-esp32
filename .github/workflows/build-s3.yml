@@ -28,9 +28,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install protobuf grpcio-tools
 
-          export CFLAGS="-I$IDF_PATH/components/esp_eth/include $CFLAGS"
-          export CXXFLAGS="-I$IDF_PATH/components/esp_eth/include $CXXFLAGS"
-
           cat << 'EOF' >> sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
@@ -42,7 +39,7 @@ jobs:
           EOF
 
           idf.py set-target esp32s3
-          idf.py build
+          idf.py -DEXTRA_CFLAGS="-I$IDF_PATH/components/esp_eth/include" build
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
