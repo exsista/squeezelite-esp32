@@ -13,6 +13,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: 'recursive'
 
       - name: Prepare and Build
@@ -21,11 +22,15 @@ jobs:
           . $IDF_PATH/export.sh
           pip install --upgrade pip
           pip install protobuf==4.25.6 grpcio-tools==1.62.3
+          
+          cat << 'EOF' >> sdkconfig.defaults
+          CONFIG_IDF_TARGET="esp32s3"
+          CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+          CONFIG_SPIRAM_MODE_OCT=y
+          CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+          EOF
+
           idf.py set-target esp32s3
-          echo 'CONFIG_IDF_TARGET="esp32s3"' >> sdkconfig.defaults
-          echo 'CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y' >> sdkconfig.defaults
-          echo 'CONFIG_SPIRAM_MODE_OCT=y' >> sdkconfig.defaults
-          echo 'CONFIG_ESPTOOLPY_FLASHMODE_DIO=y' >> sdkconfig.defaults
           idf.py build
 
       - name: Upload Binaries
