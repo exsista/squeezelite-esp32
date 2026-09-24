@@ -36,10 +36,11 @@ jobs:
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
           CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
           CONFIG_SPIRAM_TYPE_AUTO=y
+          CONFIG_ETH_USE_ESP32_EMAC=n
           EOF
 
           idf.py set-target esp32s3
-          idf.py -DEXTRA_CFLAGS="-I$IDF_PATH/components/esp_eth/include" build
+          idf.py -DIDF_EXTRA_COMPONENT_DIRS="$IDF_PATH/components/esp_eth" build
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
