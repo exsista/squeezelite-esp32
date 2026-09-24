@@ -21,6 +21,9 @@ jobs:
         run: |
           . $IDF_PATH/export.sh
           
+          # Mengatasi error dubious ownership di Git container
+          git config --global --add safe.directory '*'
+
           git submodule update --init --recursive
 
           cat << 'EOF' >> sdkconfig.defaults
