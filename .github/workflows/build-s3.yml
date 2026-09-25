@@ -19,7 +19,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Neutralize Ethernet Driver For S3
+      - name: Provide Dummy Ethernet Header & Configure
         shell: bash
         run: |
           . $IDF_PATH/export.sh
@@ -28,37 +28,55 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "protobuf==4.25.6" "grpcio-tools==1.62.3"
 
-          # 1. Hapus #include esp_eth.h dari seluruh komponen wifi-manager
-          find components/wifi-manager/ -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i '/#include.*esp_eth\.h/d' {} +
+          # 1. Buat folder esp_eth di komponen IDF jika belum ada
+          mkdir -p $IDF_PATH/components/esp_eth/include
 
-          # 2. Netralkan network_ethernet.h dengan typedef dummy agar esp_eth_handle_t dikenali
-          cat << 'EOF' > components/wifi-manager/network_ethernet.h
-          #ifndef NETWORK_ETHERNET_H
-          #define NETWORK_ETHERNET_H
+          # 2. Suntikkan esp_eth.h dummy yang LENGKAP agar semua driver Ethernet komplit tipe datanya
+          cat << 'EOF' > $IDF_PATH/components/esp_eth/include/esp_eth.h
+          #ifndef ESP_ETH_H
+          #define ESP_ETH_H
           #include "esp_err.h"
+          #include "esp_event.h"
+          #include <stdbool.h>
+          #include <stdint.h>
+
           typedef void* esp_eth_handle_t;
-          void network_ethernet_init(void);
-          void network_ethernet_start(void);
-          void network_ethernet_stop(void);
+
+          typedef enum {
+              ETH_CMD_G_MAC_ADDR,
+              ETH_CMD_S_MAC_ADDR,
+              ETH_CMD_G_PHY_ADDR,
+              ETH_CMD_S_PHY_ADDR,
+              ETH_CMD_G_AUTONEG,
+              ETH_CMD_S_AUTONEG,
+              ETH_CMD_G_SPEED,
+              ETH_CMD_S_SPEED,
+              ETH_CMD_G_DUPLEX_MODE,
+              ETH_CMD_S_DUPLEX_MODE,
+              ETH_CMD_S_FLOW_CTRL,
+              ETH_CMD_G_PHY_REG
+          } esp_eth_io_cmd_t;
+
+          typedef enum {
+              ETHERNET_EVENT_START,
+              ETHERNET_EVENT_STOP,
+              ETHERNET_EVENT_CONNECTED,
+              ETHERNET_EVENT_DISCONNECTED,
+              ETHERNET_EVENT_GOT_IP
+          } eth_event_t;
+
+          ESP_EVENT_DECLARE_BASE(ETH_EVENT);
+
+          static inline esp_err_t esp_eth_ioctl(esp_eth_handle_t h, esp_eth_io_cmd_t cmd, void *data) { return ESP_OK; }
+          static inline esp_err_t esp_eth_start(esp_eth_handle_t h) { return ESP_OK; }
+          static inline esp_err_t esp_eth_stop(esp_eth_handle_t h) { return ESP_OK; }
           #endif
           EOF
 
-          # 3. Netralkan file implementation Ethernet & Driver LAN8720
-          cat << 'EOF' > components/wifi-manager/network_ethernet.c
-          #include "network_ethernet.h"
-          void network_ethernet_init(void) {}
-          void network_ethernet_start(void) {}
-          void network_ethernet_stop(void) {}
-          EOF
-
-          cat << 'EOF' > components/wifi-manager/network_driver_LAN8720.c
-          // LAN8720 Driver Disabled for ESP32-S3
-          EOF
-
-          # 4. Bersihkan build/config lama
+          # 3. Bersihkan cache build/sdkconfig lama
           rm -rf build sdkconfig
 
-          # 5. Konfigurasi ESP32-S3 N16R8 (Octal PSRAM 8MB & Flash 16MB)
+          # 4. Konfigurasi ESP32-S3 N16R8 (Flash 16MB & Octal PSRAM 8MB)
           cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
@@ -87,6 +105,10 @@ jobs:
           idf.py --version
 
           echo "=== BUILD ==="
+          # Tambahkan include path esp_eth ke CFLAGS secara global
+          export CFLAGS="-I$IDF_PATH/components/esp_eth/include $CFLAGS"
+          export CXXFLAGS="-I$IDF_PATH/components/esp_eth/include $CXXFLAGS"
+
           idf.py build
 
       - name: Upload Binaries
