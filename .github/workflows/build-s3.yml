@@ -18,7 +18,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Hard-Bypass Ethernet Dependencies
+      - name: Fix Dependencies and Config
         shell: bash
         run: |
           . $IDF_PATH/export.sh
@@ -27,28 +27,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "protobuf==4.25.6" "grpcio-tools==1.62.3"
 
-          # 1. BYPASS CMAKE: Salin paksa semua header Ethernet resmi ESP-IDF ke folder wifi-manager
-          cp $IDF_PATH/components/esp_eth/include/* components/wifi-manager/
-
-          # 2. Hapus isi file driver Ethernet fisik agar tidak memicu error EMAC S3 saat proses Linking
-          find components/wifi-manager/ -type f -name "network_driver_*.c" -exec sh -c 'echo "// Disabled for S3" > "$1"' _ {} \;
-          echo '// Disabled for S3' > components/wifi-manager/network_ethernet.c
-
-          # 3. Suntikkan fungsi dummy agar sistem utama Squeezelite tidak mencari driver Ethernet
-          cat << 'EOF' > components/wifi-manager/network_ethernet.h
-          #ifndef NETWORK_ETHERNET_H
-          #define NETWORK_ETHERNET_H
-          #include "esp_err.h"
-          typedef void* esp_eth_handle_t;
-          static inline void network_ethernet_init(void) {}
-          static inline void network_ethernet_start(void) {}
-          static inline void network_ethernet_stop(void) {}
-          #endif
-          EOF
-
-          # 4. Bersihkan cache dan setup S3
+          # 1. HANYA salin header esp_eth bawaan ESP-IDF ke folder wifi-manager.
+          # JANGAN menghapus/memodifikasi file .c atau .h milik Squeezelite agar strukturnya utuh.
+          cp -r $IDF_PATH/components/esp_eth/include/* components/wifi-manager/
+          
+          # Bersihkan cache dari build sebelumnya
           rm -rf build sdkconfig
           
+          # 2. Konfigurasi ESP32-S3 N16R8 (Octal PSRAM) dan pancing library Ethernet
           cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
@@ -59,13 +45,16 @@ jobs:
           CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
           CONFIG_COMPILER_CXX_EXCEPTIONS=y
           CONFIG_ETH_USE_ESP32_EMAC=n
-          CONFIG_ETH_USE_SPI_ETHERNET=n
+          CONFIG_ETH_USE_SPI_ETHERNET=y
           EOF
 
+          # Set target chip
           idf.py set-target esp32s3
+          
+          # 3. Suntik flag C++ Exception yang diwajibkan oleh Squeezelite
           echo 'string(APPEND CMAKE_CXX_FLAGS " -fexceptions")' >> CMakeLists.txt
 
-      - name: Build Firmware
+      - name: Compile Firmware
         shell: bash
         run: |
           . $IDF_PATH/export.sh
