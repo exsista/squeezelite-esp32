@@ -29,7 +29,7 @@ jobs:
           
           rm -rf build sdkconfig
           
-          # Konfigurasi ESP32-S3 N16R8 dan pancing library Ethernet via SPI
+          # Konfigurasi ESP32-S3 N16R8, Ethernet SPI, dan MATIKAN Bluetooth Classic (A2DP Sink)
           cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
@@ -41,21 +41,20 @@ jobs:
           CONFIG_COMPILER_CXX_EXCEPTIONS=y
           CONFIG_ETH_USE_SPI_ETHERNET=y
           CONFIG_ETH_SPI_ETHERNET_W5500=y
+          CONFIG_BT_SINK=n
+          CONFIG_BT_ENABLED=n
+          CONFIG_CLASSIC_BT_ENABLED=n
           EOF
 
           idf.py set-target esp32s3
           
-          # [PERBAIKAN] Suntik lokasi header esp_eth secara global langsung ke dalam sistem CMake!
           echo 'include_directories("$ENV{IDF_PATH}/components/esp_eth/include")' >> CMakeLists.txt
-          
-          # Suntik flag C++ Exception yang diwajibkan oleh komponen CSpot (Spotify)
           echo 'string(APPEND CMAKE_CXX_FLAGS " -fexceptions")' >> CMakeLists.txt
 
       - name: Compile Firmware
         shell: bash
         run: |
           . $IDF_PATH/export.sh
-          # Build berjalan normal tanpa parameter selundupan
           idf.py build
 
       - name: Upload Binaries
