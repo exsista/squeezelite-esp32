@@ -29,17 +29,7 @@ jobs:
           
           rm -rf build sdkconfig
           
-          # Buat file partisi kustom (partitions.csv) agar ruang aplikasi diperbesar menjadi 4MB
-          cat << 'EOF' > partitions.csv
-          # Name,   Type, SubType, Offset,  Size, Flags
-          nvs,      data, nvs,     ,        0x4000,
-          otadata,  data, ota,     ,        0x2000,
-          phy_init, data, phy,     ,        0x1000,
-          factory,  app,  factory, ,        0x400000,
-          storage,  data,,         ,        0x100000,
-          EOF
-
-          # Konfigurasi ESP32-S3 N16R8 dan arahkan agar membaca partitions.csv buatan kita
+          # Konfigurasi ESP32-S3 N16R8 dan pemetaan pin I2S yang aman
           cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
@@ -54,9 +44,10 @@ jobs:
           CONFIG_BT_SINK=n
           CONFIG_BT_ENABLED=n
           CONFIG_CLASSIC_BT_ENABLED=n
-          CONFIG_PARTITION_TABLE_CUSTOM=y
-          CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
-          CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+          CONFIG_I2S_BCK_IO_NUM=15
+          CONFIG_I2S_WS_IO_NUM=16
+          CONFIG_I2S_DATA_OUT_NUM=17
+          CONFIG_I2S_DATA_IN_NUM=-1
           EOF
 
           idf.py set-target esp32s3
