@@ -18,7 +18,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Fix Dependencies and Config
+      - name: Configure Firmware
         shell: bash
         run: |
           . $IDF_PATH/export.sh
@@ -26,15 +26,10 @@ jobs:
 
           python -m pip install --upgrade pip
           python -m pip install "protobuf==4.25.6" "grpcio-tools==1.62.3"
-
-          # 1. HANYA salin header esp_eth bawaan ESP-IDF ke folder wifi-manager.
-          # JANGAN menghapus/memodifikasi file .c atau .h milik Squeezelite agar strukturnya utuh.
-          cp -r $IDF_PATH/components/esp_eth/include/* components/wifi-manager/
           
-          # Bersihkan cache dari build sebelumnya
           rm -rf build sdkconfig
           
-          # 2. Konfigurasi ESP32-S3 N16R8 (Octal PSRAM) dan pancing library Ethernet
+          # Konfigurasi ESP32-S3 N16R8 dan pancing library Ethernet via SPI
           cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
@@ -44,20 +39,23 @@ jobs:
           CONFIG_SPIRAM_TYPE_AUTO=y
           CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
           CONFIG_COMPILER_CXX_EXCEPTIONS=y
-          CONFIG_ETH_USE_ESP32_EMAC=n
           CONFIG_ETH_USE_SPI_ETHERNET=y
+          CONFIG_ETH_SPI_ETHERNET_W5500=y
           EOF
 
-          # Set target chip
           idf.py set-target esp32s3
           
-          # 3. Suntik flag C++ Exception yang diwajibkan oleh Squeezelite
+          # [PERBAIKAN] Suntik lokasi header esp_eth secara global langsung ke dalam sistem CMake!
+          echo 'include_directories("$ENV{IDF_PATH}/components/esp_eth/include")' >> CMakeLists.txt
+          
+          # Suntik flag C++ Exception yang diwajibkan oleh komponen CSpot (Spotify)
           echo 'string(APPEND CMAKE_CXX_FLAGS " -fexceptions")' >> CMakeLists.txt
 
       - name: Compile Firmware
         shell: bash
         run: |
           . $IDF_PATH/export.sh
+          # Build berjalan normal tanpa parameter selundupan
           idf.py build
 
       - name: Upload Binaries
