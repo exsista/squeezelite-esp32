@@ -1,3 +1,4 @@
+
 name: Build ESP32-S3 N16R8
 
 on:
@@ -6,12 +7,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     container:
       image: espressif/idf:v4.4.8
 
     steps:
-      - name: Checkout Squeezelite Codebase
+      - name: Checkout Codebase
         uses: actions/checkout@v4
         with:
           repository: 'sle118/squeezelite-esp32'
@@ -19,7 +19,7 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Provide Dummy Ethernet Header & Configure
+      - name: Patch CMake Dependencies & Configure
         shell: bash
         run: |
           . $IDF_PATH/export.sh
@@ -28,90 +28,51 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "protobuf==4.25.6" "grpcio-tools==1.62.3"
 
-          # 1. Buat folder esp_eth di komponen IDF jika belum ada
-          mkdir -p $IDF_PATH/components/esp_eth/include
-
-          # 2. Suntikkan esp_eth.h dummy yang LENGKAP agar semua driver Ethernet komplit tipe datanya
-          cat << 'EOF' > $IDF_PATH/components/esp_eth/include/esp_eth.h
-          #ifndef ESP_ETH_H
-          #define ESP_ETH_H
-          #include "esp_err.h"
-          #include "esp_event.h"
-          #include <stdbool.h>
-          #include <stdint.h>
-
-          typedef void* esp_eth_handle_t;
-
-          typedef enum {
-              ETH_CMD_G_MAC_ADDR,
-              ETH_CMD_S_MAC_ADDR,
-              ETH_CMD_G_PHY_ADDR,
-              ETH_CMD_S_PHY_ADDR,
-              ETH_CMD_G_AUTONEG,
-              ETH_CMD_S_AUTONEG,
-              ETH_CMD_G_SPEED,
-              ETH_CMD_S_SPEED,
-              ETH_CMD_G_DUPLEX_MODE,
-              ETH_CMD_S_DUPLEX_MODE,
-              ETH_CMD_S_FLOW_CTRL,
-              ETH_CMD_G_PHY_REG
-          } esp_eth_io_cmd_t;
-
-          typedef enum {
-              ETHERNET_EVENT_START,
-              ETHERNET_EVENT_STOP,
-              ETHERNET_EVENT_CONNECTED,
-              ETHERNET_EVENT_DISCONNECTED,
-              ETHERNET_EVENT_GOT_IP
-          } eth_event_t;
-
-          ESP_EVENT_DECLARE_BASE(ETH_EVENT);
-
-          static inline esp_err_t esp_eth_ioctl(esp_eth_handle_t h, esp_eth_io_cmd_t cmd, void *data) { return ESP_OK; }
-          static inline esp_err_t esp_eth_start(esp_eth_handle_t h) { return ESP_OK; }
-          static inline esp_err_t esp_eth_stop(esp_eth_handle_t h) { return ESP_OK; }
-          #endif
+          # Skrip python untuk menyuntikkan dependensi 'esp_eth' secara resmi ke semua komponen CMake
+          cat << 'EOF' > patch_cmake.py
+          import glob
+          for path in glob.glob('components/*/CMakeLists.txt') + ['main/CMakeLists.txt']:
+              try:
+                  with open(path, 'r') as f: c = f.read()
+                  if 'idf_component_register' in c and 'esp_eth' not in c:
+                      if 'REQUIRES ' in c:
+                          c = c.replace('REQUIRES ', 'REQUIRES esp_eth ')
+                      elif 'PRIV_REQUIRES ' in c:
+                          c = c.replace('PRIV_REQUIRES ', 'PRIV_REQUIRES esp_eth ')
+                      else:
+                          c = c.replace('idf_component_register(', 'idf_component_register(REQUIRES esp_eth ')
+                      with open(path, 'w') as f: f.write(c)
+              except: pass
           EOF
+          python patch_cmake.py
 
-          # 3. Bersihkan cache build/sdkconfig lama
+          # Bersihkan riwayat build gagal sebelumnya
           rm -rf build sdkconfig
 
-          # 4. Konfigurasi ESP32-S3 N16R8 (Flash 16MB & Octal PSRAM 8MB)
+          # Konfigurasi mutlak untuk S3 N16R8 + CSpot (Spotify) + Matikan Ethernet Hardware
           cat << 'EOF' > sdkconfig.defaults
           CONFIG_IDF_TARGET="esp32s3"
-          CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
-          CONFIG_COMPILER_CXX_EXCEPTIONS=y
           CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
           CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
           CONFIG_SPIRAM=y
           CONFIG_SPIRAM_MODE_OCT=y
           CONFIG_SPIRAM_TYPE_AUTO=y
+          CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS=2
+          CONFIG_COMPILER_CXX_EXCEPTIONS=y
           CONFIG_ETH_USE_ESP32_EMAC=n
           CONFIG_ETH_USE_SPI_ETHERNET=n
           EOF
 
-          # Set target ke ESP32-S3
           idf.py set-target esp32s3
-
-          # Tambahkan dukungan C++ exceptions untuk CSpot
           echo 'string(APPEND CMAKE_CXX_FLAGS " -fexceptions")' >> CMakeLists.txt
 
-      - name: Build Firmware
+      - name: Compile Firmware
         shell: bash
         run: |
           . $IDF_PATH/export.sh
-
-          echo "=== ESP-IDF VERSION ==="
-          idf.py --version
-
-          echo "=== BUILD ==="
-          # Tambahkan include path esp_eth ke CFLAGS secara global
-          export CFLAGS="-I$IDF_PATH/components/esp_eth/include $CFLAGS"
-          export CXXFLAGS="-I$IDF_PATH/components/esp_eth/include $CXXFLAGS"
-
           idf.py build
 
-      - name: Upload Binaries
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         if: success()
         with:
